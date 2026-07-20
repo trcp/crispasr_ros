@@ -52,6 +52,10 @@ if ROS_VERSION == 1:
         def get_param(self, name: str, default: ParamT) -> ParamT:
             return cast(ParamT, rospy.get_param("~" + name, default))
 
+        def get_param_live(self, name: str, default: ParamT) -> ParamT:
+            """Read the current value from the parameter server (runtime-changeable)."""
+            return cast(ParamT, rospy.get_param("~" + name, default))
+
         def create_publisher(self, msg_type: Any, name: str) -> Publisher:
             # We use global name resolve by default, but fallback if specified
             topic = name if name.startswith("/") or name.startswith("~") else "~" + name
@@ -108,6 +112,13 @@ elif ROS_VERSION == 2:
 
         def get_param(self, name: str, default: ParamT) -> ParamT:
             return cast(ParamT, self._node.declare_parameter(name, default).value)
+
+        def get_param_live(self, name: str, default: ParamT) -> ParamT:
+            """Read the current value of an already-declared parameter (runtime-changeable)."""
+            try:
+                return cast(ParamT, self._node.get_parameter(name).value)
+            except rclpy.exceptions.ParameterNotDeclaredException:
+                return default
 
         def create_publisher(self, msg_type: Any, name: str) -> Publisher:
             topic = name if name.startswith("/") or name.startswith("~/") else "~/" + name

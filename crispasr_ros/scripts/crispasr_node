@@ -271,6 +271,18 @@ class CrispASRNode:
             except queue.Empty:
                 return
 
+    def _current_language(self) -> Optional[str]:
+        """Re-read the language param so it can be switched at runtime.
+
+        Returns None (auto-detect) when the param is empty.
+        """
+        try:
+            self.language = str(self.node.get_param_live("language", self.language))
+        except Exception as e:
+            self.node.log_warn(f"Failed to read language param: {e}")
+        lang = self.language.strip()
+        return lang if lang else None
+
     def _processing_loop(self) -> None:
         """Worker loop that handles VAD computation, timeouts, and ASR inference."""
         audio_buffer: List[float] = []
@@ -282,8 +294,6 @@ class CrispASRNode:
         transcribe_interval = 0.6  # Partial transcription interval (seconds)
         silence_timeout = 1.5  # Watchdog timeout (seconds)
         min_vad_samples = int(0.5 * self.sample_rate)
-
-        lang_code = self.language.strip() if self.language.strip() else None
 
         while self.keep_running and not self.node.is_shutdown():
             if self.clear_requested.is_set():
@@ -330,7 +340,7 @@ class CrispASRNode:
             if now - self.last_rx_time > silence_timeout and len(audio_buffer) > 0:
                 self.node.log_info("Silence watchdog timeout. Flushing entire buffer.")
                 audio_buffer, in_speech, last_partial_text = self._flush_buffer(
-                    audio_buffer, lang_code, cut_time_sec=None
+                    audio_buffer, self._current_language(), cut_time_sec=None
                 )
                 phrase_start_sec = None
                 self.last_rx_time = now
@@ -371,7 +381,7 @@ class CrispASRNode:
                             f"Phrase time limit reached ({self.phrase_time_limit:.2f}s). Flushing buffer."
                         )
                         audio_buffer, in_speech, last_partial_text = self._flush_buffer(
-                            audio_buffer, lang_code, cut_time_sec=cut_time_sec
+                            audio_buffer, self._current_language(), cut_time_sec=cut_time_sec
                         )
                         phrase_start_sec = None
                         self.last_rx_time = now
@@ -383,7 +393,7 @@ class CrispASRNode:
                             f"VAD detected speech end (silence gap: {total_duration - last_end:.2f}s). Flushing buffer."
                         )
                         audio_buffer, in_speech, last_partial_text = self._flush_buffer(
-                            audio_buffer, lang_code, cut_time_sec=last_end
+                            audio_buffer, self._current_language(), cut_time_sec=last_end
                         )
                         phrase_start_sec = None
                         self.last_rx_time = now
@@ -403,7 +413,7 @@ class CrispASRNode:
             ):
                 if now - last_inference_time > transcribe_interval:
                     pcm_array = np.array(audio_buffer, dtype=np.float32)
-                    text = self.engine.transcribe(pcm_array, language=lang_code)
+                    text = self.engine.transcribe(pcm_array, language=self._current_language())
                     if self.clear_requested.is_set():
                         continue
                     if text and text != last_partial_text:
