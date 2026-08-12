@@ -80,12 +80,14 @@ class CrispASRNode:
                 "ok",
                 "okay",
                 "ready",
+                "lady"
                 "done",
                 "release",
                 "はい",
                 "うん",
                 "レディ",
                 "リリース",
+                "レディー",
             ],
         )
         confirmation_negative_words = self.node.get_param(
