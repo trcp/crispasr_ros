@@ -80,7 +80,7 @@ class CrispASRNode:
                 "ok",
                 "okay",
                 "ready",
-                "lady"
+                "lady",
                 "done",
                 "release",
                 "はい",
